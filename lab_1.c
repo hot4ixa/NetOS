@@ -16,7 +16,6 @@ typedef enum { WEST = 0, EAST = 1, NONE = -1 } Side;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
-sem_t rope_capacity;
 
 int west_on_rope = 0; // количество западных бабуинов на канате
 int east_on_rope = 0; // количество восточных бабуинов на канате
@@ -34,6 +33,7 @@ typedef struct
 
 bool can_cross( Baboon * baboon )
 {
+    if ( west_on_rope >= MAX_ON_ROPE || east_on_rope >= MAX_ON_ROPE ) return false;
     if ( baboon->side == WEST && east_on_rope > 0 ) return false;
     if ( baboon->side == EAST && west_on_rope > 0 ) return false;
     
@@ -54,7 +54,7 @@ void * baboon_thread( void * arg )
     
     while ( !can_cross( baboon ) )
     {
-        if ( patience <= 0 && !rope_shaking )
+        if ( patience <= 0 && !rope_shaking && ((baboon->side == WEST && east_on_rope > 0 ) || (baboon->side == EAST && west_on_rope > 0 )) )
         {
             printf("[ %d ] %s бабуин начал трясти канат!\n", baboon->id, side_name[ baboon->side ] );
             rope_shaking = true;
@@ -73,12 +73,6 @@ void * baboon_thread( void * arg )
         pthread_cond_timedwait(&cond, &mutex, &ts);
         patience -= 100;
     }
-    
-    pthread_mutex_unlock(&mutex);
-    
-    sem_wait(&rope_capacity);    
-    
-    pthread_mutex_lock(&mutex);
 
     if ( baboon->side == WEST ) west_on_rope++;
     else east_on_rope++;
@@ -104,8 +98,6 @@ void * baboon_thread( void * arg )
     
     pthread_cond_broadcast( &cond );
     pthread_mutex_unlock( &mutex );
-
-    sem_post(&rope_capacity);
     
     free( baboon );
 }
@@ -156,8 +148,6 @@ int main()
 {
     setbuf(stdout, NULL);
     srand( time( NULL ) );
-
-    sem_init(&rope_capacity, 0, MAX_ON_ROPE);
     
     pthread_t west;
     pthread_t east;
