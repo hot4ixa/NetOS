@@ -9,17 +9,8 @@
 #define PORT 8888
 #define BUFFER_SIZE 256
 
-int main(int argc, char *argv[])
+int main()
 {
-    if (argc != 3)
-    {
-        fprintf(stderr, "Использование: %s <количество> <сторона (west/east)>\n", argv[0]);
-        return 1;
-    }
-
-    int count = atoi(argv[1]);
-    char *side = argv[2];
-
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0)
     {
@@ -39,18 +30,29 @@ int main(int argc, char *argv[])
         close(sock);
         return 1;
     }
+    printf("Для выхода введите количество меньше 1\n");
 
-    char buffer[BUFFER_SIZE];
-    snprintf(buffer, BUFFER_SIZE, "%d %s\n", count, side);
-
-    if (send(sock, buffer, strlen(buffer), 0) < 0)
+    while (1)
     {
-        perror("send");
-        close(sock);
-        return 1;
-    }
+        int count = 0;
+        char side[20] = {0};
+        printf("Введите: <количество> <сторона (west/east)>\n");
+        scanf("%d %s", &count, side);
 
+        if (count < 1)
+            break;
+
+        char buffer[BUFFER_SIZE];
+        snprintf(buffer, BUFFER_SIZE, "%d %s\n", count, side);
+
+        if (send(sock, buffer, strlen(buffer), 0) < 0)
+        {
+            perror("send");
+            close(sock);
+            return 1;
+        }
+        printf("Запрос отправлен: %s\n", buffer);
+    }
     close(sock);
-    printf("Запрос отправлен: %s", buffer);
     return 0;
 }
