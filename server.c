@@ -13,10 +13,10 @@
 
 #define NUM_EAST 10
 #define NUM_WEST 50
-#define MAX_PATIENCE 200
-#define CROSS_TIME 1000
+#define MAX_PATIENCE 20000
+#define CROSS_TIME 100000
 #define MAX_ON_ROPE 5
-#define MAX_INTERVAL 500
+#define MAX_INTERVAL 50000
 #define PORT 8888
 #define BUFFER_SIZE 256
 
@@ -117,69 +117,73 @@ void * handle_client(void * arg)
 {
     int client_fd = *(int*)arg;
     free(arg);
-    char buffer[BUFFER_SIZE] = {0};
-    ssize_t bytes_read = read(client_fd, buffer, BUFFER_SIZE - 1);
-    if (bytes_read <= 0)
+
+    while (1)
     {
-        close(client_fd);
-        return NULL;
-    }
-
-    // Удаляем возможный символ новой строки
-    char *newline = strchr(buffer, '\n');
-    if (newline) *newline = '\0';
-
-    int count;
-    char side_str[10];
-    if (sscanf(buffer, "%d %s", &count, side_str) != 2 &&
-        sscanf(buffer, "%s %d", side_str, &count) != 2)
-    {
-        fprintf(stderr, "Неверный формат запроса: %s\n", buffer);
-        close(client_fd);
-        return NULL;
-    }
-
-    Side side;
-    if (strcmp(side_str, "west") == 0 || strcmp(side_str, "запад") == 0)
-        side = WEST;
-    else if (strcmp(side_str, "east") == 0 || strcmp(side_str, "восток") == 0)
-        side = EAST;
-    else
-    {
-        fprintf(stderr, "Неизвестная сторона: %s\n", side_str);
-        close(client_fd);
-        return NULL;
-    }
-
-    printf("Клиент запросил %d %s бабуинов\n", count, side_name[side]);
-
-    // Создание бабуинов
-    for (int i = 0; i < count; i++)
-    {
-        Baboon *baboon = malloc(sizeof(Baboon));
-        if (!baboon)
+        char buffer[BUFFER_SIZE] = {0};
+        ssize_t bytes_read = read(client_fd, buffer, BUFFER_SIZE - 1);
+        if (bytes_read <= 0)
         {
-            perror("malloc");
-            continue;
+            close(client_fd);
+            return NULL;
         }
 
-        // Генерация уникального ID
-        pthread_mutex_lock(&id_mutex);
-        baboon->id = ++next_id;
-        pthread_mutex_unlock(&id_mutex);
+        // Удаляем возможный символ новой строки
+        char *newline = strchr(buffer, '\n');
+        if (newline) *newline = '\0';
 
-        baboon->side = side;
-        baboon->patience = rand() % MAX_PATIENCE;
+        int count;
+        char side_str[10];
+        if (sscanf(buffer, "%d %s", &count, side_str) != 2 &&
+            sscanf(buffer, "%s %d", side_str, &count) != 2)
+        {
+            fprintf(stderr, "Неверный формат запроса: %s\n", buffer);
+            close(client_fd);
+            return NULL;
+        }
 
-        pthread_attr_t attr;
-        pthread_attr_init(&attr);
-        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+        Side side;
+        if (strcmp(side_str, "west") == 0 || strcmp(side_str, "запад") == 0)
+            side = WEST;
+        else if (strcmp(side_str, "east") == 0 || strcmp(side_str, "восток") == 0)
+            side = EAST;
+        else
+        {
+            fprintf(stderr, "Неизвестная сторона: %s\n", side_str);
+            close(client_fd);
+            return NULL;
+        }
 
-        pthread_t thread;
-        pthread_create(&thread, &attr, baboon_thread, baboon);
-        pthread_attr_destroy(&attr);
+        printf("Клиент запросил %d %s бабуинов\n", count, side_name[side]);
 
-        usleep(rand() % MAX_INTERVAL);
+        // Создание бабуинов
+        for (int i = 0; i < count; i++)
+        {
+            Baboon *baboon = malloc(sizeof(Baboon));
+            if (!baboon)
+            {
+                perror("malloc");
+                continue;
+            }
+
+            // Генерация уникального ID
+            pthread_mutex_lock(&id_mutex);
+            baboon->id = ++next_id;
+            pthread_mutex_unlock(&id_mutex);
+
+            baboon->side = side;
+            baboon->patience = rand() % MAX_PATIENCE;
+
+            pthread_attr_t attr;
+            pthread_attr_init(&attr);
+            pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
+            pthread_t thread;
+            pthread_create(&thread, &attr, baboon_thread, baboon);
+            pthread_attr_destroy(&attr);
+
+            usleep(rand() % MAX_INTERVAL);
+        }
     }
 
     close(client_fd);
