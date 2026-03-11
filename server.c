@@ -62,7 +62,11 @@ void * baboon_thread( void * arg )
     int patience = baboon->patience;
 
     printf( "[ %d ] %s бабуин подошел\n", baboon->id, side_name[ baboon->side ] );
-    fprintf( baboon->client_fd, "[ %d ] %s бабуин подошел\n", baboon->id, side_name[ baboon->side ] );
+    
+    char buffer[BUFFER_SIZE];
+    memset(buffer, 0, sizeof(buffer));
+    snprintf( buffer, BUFFER_SIZE, "[ %d ] %s бабуин подошел\n", baboon->id, side_name[ baboon->side ] );
+    send(baboon->client_fd, buffer, strlen(buffer), 0);
 
     pthread_mutex_lock(&mutex);
 
@@ -71,7 +75,11 @@ void * baboon_thread( void * arg )
         if ( patience <= 0 && !rope_shaking && ((baboon->side == WEST && east_on_rope > 0 ) || (baboon->side == EAST && west_on_rope > 0 )) )
         {
             printf("[ %d ] %s бабуин начал трясти канат!\n", baboon->id, side_name[ baboon->side ] );
-            fprintf( baboon->client_fd, "[ %d ] %s бабуин начал трясти канат!\n", baboon->id, side_name[ baboon->side ] );
+            memset(buffer, 0, sizeof(buffer));
+            
+            snprintf( buffer, BUFFER_SIZE, "[ %d ] %s бабуин начал трясти канат!\n", baboon->id, side_name[ baboon->side ] );
+            send(baboon->client_fd, buffer, strlen(buffer), 0);
+            
             rope_shaking = true;
             shaking_side = baboon->side;
             pthread_cond_broadcast(&cond);
@@ -94,10 +102,10 @@ void * baboon_thread( void * arg )
 
     printf( "[ %d ] %s бабуин лезет по канату ( В = %d; З = %d ) [ %d %d ]\n",
             baboon->id, side_name[ baboon->side ], east_on_rope, west_on_rope, shaking_side, rope_shaking );
-
-    fprintf( baboon->client_fd, "[ %d ] %s бабуин лезет по канату ( В = %d; З = %d ) [ %d %d ]\n",
+    memset(buffer, 0, sizeof(buffer));
+    snprintf( buffer, BUFFER_SIZE, "[ %d ] %s бабуин лезет по канату ( В = %d; З = %d ) [ %d %d ]\n",
              baboon->id, side_name[ baboon->side ], east_on_rope, west_on_rope, shaking_side, rope_shaking );
-
+    send(baboon->client_fd, buffer, strlen(buffer), 0);
 
     pthread_mutex_unlock(&mutex);
 
@@ -112,7 +120,10 @@ void * baboon_thread( void * arg )
         rope_shaking = false;
 
     printf( "[ %d ] %s бабуин перелез\n", baboon->id, side_name[ baboon->side ] );
-    fprintf( baboon->client_fd, "[ %d ] %s бабуин перелез\n", baboon->id, side_name[ baboon->side ] );
+    memset(buffer, 0, sizeof(buffer));
+    snprintf( buffer, BUFFER_SIZE, "[ %d ] %s бабуин перелез\n", baboon->id, side_name[ baboon->side ] );
+    send(baboon->client_fd, buffer, strlen(buffer), 0);
+
 
     pthread_cond_broadcast( &cond );
     pthread_mutex_unlock( &mutex );
