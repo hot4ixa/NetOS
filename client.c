@@ -53,9 +53,19 @@ int main()
         }
         printf("Запрос отправлен: %s\n", buffer);
 
-        while (read(sock, buffer, BUFFER_SIZE - 1);)
-        {
-            printf( "%s", buffer );
+        fd_set readfds;
+        struct timeval tv;
+
+        FD_ZERO(&readfds);
+        FD_SET(sock, &readfds);
+        tv.tv_sec = 5;
+        tv.tv_usec = 0;
+
+        while (select(sock + 1, &readfds, NULL, NULL, &tv) > 0) {
+            memset(buffer, 0, BUFFER_SIZE);
+            int bytes = read(sock, buffer, BUFFER_SIZE - 1);
+            if (bytes > 0)
+                printf("%s", buffer);
         }
     }
     close(sock);
