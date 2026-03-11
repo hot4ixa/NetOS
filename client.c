@@ -52,6 +52,11 @@ int main()
             return 1;
         }
         printf("Запрос отправлен: %s\n", buffer);
+
+        while (read(sock, buffer, BUFFER_SIZE - 1);)
+        {
+            printf( "%s", buffer );
+        }
     }
     close(sock);
     return 0;
