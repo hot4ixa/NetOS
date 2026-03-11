@@ -38,9 +38,10 @@ pthread_mutex_t id_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct
 {
-    int patience;
-    Side         side;
-    int          id;
+    int  patience;
+    Side side;
+    int  id;
+    int  client_fd;
 } Baboon;
 
 bool can_cross( Baboon * baboon )
@@ -61,6 +62,7 @@ void * baboon_thread( void * arg )
     int patience = baboon->patience;
 
     printf( "[ %d ] %s бабуин подошел\n", baboon->id, side_name[ baboon->side ] );
+    fprintf( baboon->client_fd, "[ %d ] %s бабуин подошел\n", baboon->id, side_name[ baboon->side ] );
 
     pthread_mutex_lock(&mutex);
 
@@ -69,6 +71,7 @@ void * baboon_thread( void * arg )
         if ( patience <= 0 && !rope_shaking && ((baboon->side == WEST && east_on_rope > 0 ) || (baboon->side == EAST && west_on_rope > 0 )) )
         {
             printf("[ %d ] %s бабуин начал трясти канат!\n", baboon->id, side_name[ baboon->side ] );
+            fprintf( baboon->client_fd, "[ %d ] %s бабуин начал трясти канат!\n", baboon->id, side_name[ baboon->side ] );
             rope_shaking = true;
             shaking_side = baboon->side;
             pthread_cond_broadcast(&cond);
@@ -92,6 +95,10 @@ void * baboon_thread( void * arg )
     printf( "[ %d ] %s бабуин лезет по канату ( В = %d; З = %d ) [ %d %d ]\n",
             baboon->id, side_name[ baboon->side ], east_on_rope, west_on_rope, shaking_side, rope_shaking );
 
+    fprintf( baboon->client_fd, "[ %d ] %s бабуин лезет по канату ( В = %d; З = %d ) [ %d %d ]\n",
+             baboon->id, side_name[ baboon->side ], east_on_rope, west_on_rope, shaking_side, rope_shaking );
+
+
     pthread_mutex_unlock(&mutex);
 
     usleep(CROSS_TIME);
@@ -104,7 +111,8 @@ void * baboon_thread( void * arg )
     if ( baboon->side == shaking_side )
         rope_shaking = false;
 
-    printf("[ %d ] %s бабуин перелез\n", baboon->id, side_name[ baboon->side ] );
+    printf( "[ %d ] %s бабуин перелез\n", baboon->id, side_name[ baboon->side ] );
+    fprintf( baboon->client_fd, "[ %d ] %s бабуин перелез\n", baboon->id, side_name[ baboon->side ] );
 
     pthread_cond_broadcast( &cond );
     pthread_mutex_unlock( &mutex );
@@ -155,6 +163,7 @@ void * handle_client(void * arg)
         }
 
         printf("Клиент запросил %d %s бабуинов\n", count, side_name[side]);
+        
 
         // Создание бабуинов
         for (int i = 0; i < count; i++)
@@ -173,6 +182,8 @@ void * handle_client(void * arg)
 
             baboon->side = side;
             baboon->patience = rand() % MAX_PATIENCE;
+
+            baboon->client_fd = client_fd;
 
             pthread_attr_t attr;
             pthread_attr_init(&attr);
