@@ -5,13 +5,35 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 
 #define PORT 8888
 #define BUFFER_SIZE 256
 
+void * outServer(void * arg)
+{
+    int sock = *(int*)arg;
+    while (1)
+    {
+        char buffer[BUFFER_SIZE] = {0};
+        ssize_t bytes_read = read(sock, buffer, BUFFER_SIZE - 1);
+        if (bytes_read <= 0)
+        {
+            close(sock);
+            return NULL;
+        }
+        printf("%s", buffer);
+    }
+    
+    close(sock);
+    return NULL;
+}
+
 int main()
 {
+    setbuf(stdout, NULL);
     int sock = socket(AF_INET, SOCK_STREAM, 0);
+
     if (sock < 0)
     {
         perror("socket");
@@ -30,6 +52,13 @@ int main()
         close(sock);
         return 1;
     }
+    
+    pthread_t thread;
+    int * serv = malloc(sizeof(int));
+    *serv = sock;
+    pthread_create( &thread, NULL, outServer, serv );
+    
+    
     printf("Для выхода введите количество меньше 1\n");
 
     while (1)
@@ -52,21 +81,6 @@ int main()
             return 1;
         }
         printf("Запрос отправлен: %s\n", buffer);
-
-        fd_set readfds;
-        struct timeval tv;
-
-        FD_ZERO(&readfds);
-        FD_SET(sock, &readfds);
-        tv.tv_sec = 5;
-        tv.tv_usec = 0;
-
-        while (select(sock + 1, &readfds, NULL, NULL, &tv) > 0) {
-            memset(buffer, 0, BUFFER_SIZE);
-            int bytes = read(sock, buffer, BUFFER_SIZE - 1);
-            if (bytes > 0)
-                printf("%s", buffer);
-        }
     }
     close(sock);
     return 0;
