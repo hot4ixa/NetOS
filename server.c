@@ -19,6 +19,11 @@
 #define MAX_INTERVAL 50000
 #define PORT 8888
 #define BUFFER_SIZE 256
+#define MAX_CLIENTS 100
+
+pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
+int client_fds[MAX_CLIENTS];
+int client_count = 0;
 
 typedef enum { WEST = 0, EAST = 1, NONE = -1 } Side;
 
@@ -41,8 +46,40 @@ typedef struct
     int  patience;
     Side side;
     int  id;
-    int  client_fd;
 } Baboon;
+
+void add_client(int fd)
+{
+    pthread_mutex_lock(&clients_mutex);
+    if (client_count < MAX_CLIENTS) {
+        client_fds[client_count++] = fd;
+    }
+    pthread_mutex_unlock(&clients_mutex);
+}
+
+void remove_client(int fd)
+{
+    pthread_mutex_lock(&clients_mutex);
+    for (int i = 0; i < client_count; i++)
+    {
+        if (client_fds[i] == fd)
+        {
+            client_fds[i] = client_fds[--client_count];
+            break;
+        }
+    }
+    pthread_mutex_unlock(&clients_mutex);
+}
+
+void broadcast_to_all(const char *message)
+{
+    pthread_mutex_lock(&clients_mutex);
+    for (int i = 0; i < client_count; i++)
+    {
+        send(client_fds[i], message, strlen(message), MSG_NOSIGNAL);
+    }
+    pthread_mutex_unlock(&clients_mutex);
+}
 
 bool can_cross( Baboon * baboon )
 {
@@ -66,7 +103,7 @@ void * baboon_thread( void * arg )
     char buffer[BUFFER_SIZE];
     memset(buffer, 0, sizeof(buffer));
     snprintf( buffer, BUFFER_SIZE, "[ %d ] %s бабуин подошел\n", baboon->id, side_name[ baboon->side ] );
-    send(baboon->client_fd, buffer, strlen(buffer), 0);
+    broadcast_to_all(buffer);
 
     pthread_mutex_lock(&mutex);
 
@@ -78,7 +115,7 @@ void * baboon_thread( void * arg )
             memset(buffer, 0, sizeof(buffer));
             
             snprintf( buffer, BUFFER_SIZE, "[ %d ] %s бабуин начал трясти канат!\n", baboon->id, side_name[ baboon->side ] );
-            send(baboon->client_fd, buffer, strlen(buffer), 0);
+            broadcast_to_all(buffer);
             
             rope_shaking = true;
             shaking_side = baboon->side;
@@ -105,7 +142,7 @@ void * baboon_thread( void * arg )
     memset(buffer, 0, sizeof(buffer));
     snprintf( buffer, BUFFER_SIZE, "[ %d ] %s бабуин лезет по канату ( В = %d; З = %d ) [ %d %d ]\n",
              baboon->id, side_name[ baboon->side ], east_on_rope, west_on_rope, shaking_side, rope_shaking );
-    send(baboon->client_fd, buffer, strlen(buffer), 0);
+    broadcast_to_all(buffer);
 
     pthread_mutex_unlock(&mutex);
 
@@ -122,7 +159,7 @@ void * baboon_thread( void * arg )
     printf( "[ %d ] %s бабуин перелез\n", baboon->id, side_name[ baboon->side ] );
     memset(buffer, 0, sizeof(buffer));
     snprintf( buffer, BUFFER_SIZE, "[ %d ] %s бабуин перелез\n", baboon->id, side_name[ baboon->side ] );
-    send(baboon->client_fd, buffer, strlen(buffer), 0);
+    broadcast_to_all(buffer);
 
 
     pthread_cond_broadcast( &cond );
@@ -137,17 +174,19 @@ void * handle_client(void * arg)
     int client_fd = *(int*)arg;
     free(arg);
 
+    add_client(client_fd);
+
     while (1)
     {
         char buffer[BUFFER_SIZE] = {0};
         ssize_t bytes_read = read(client_fd, buffer, BUFFER_SIZE - 1);
         if (bytes_read <= 0)
         {
+            remove_client(client_fd);
             close(client_fd);
             return NULL;
         }
 
-        // Удаляем возможный символ новой строки
         char *newline = strchr(buffer, '\n');
         if (newline) *newline = '\0';
 
@@ -193,8 +232,6 @@ void * handle_client(void * arg)
 
             baboon->side = side;
             baboon->patience = rand() % MAX_PATIENCE;
-
-            baboon->client_fd = client_fd;
 
             pthread_attr_t attr;
             pthread_attr_init(&attr);
